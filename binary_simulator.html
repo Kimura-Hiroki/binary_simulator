@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>２進数シミュレーター</title>
+  <style>
+    :root {
+      --color-2: #ff6f61;
+      --bg: #f4f4f9;
+      --text: #333;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 2rem; }
+    .container { background: #fff; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.1); width:100%; max-width:600px; padding:2rem; }
+    .title { font-size:2em; font-weight:bold; text-align:center; margin-bottom:1rem; }
+    .header { display:flex; gap:1rem; align-items:center; margin-bottom:1rem; }
+    .header input[type="number"] { width:4rem; font-size:1rem; padding:0.5rem; border:1px solid #ccc; border-radius:4px; }
+    .header input[type="range"] { flex:1; }
+    .tabs { display:flex; margin-bottom:1rem; }
+    .tab { flex:1; text-align:center; padding:0.5rem; cursor:pointer; border-bottom:2px solid transparent; }
+    .tab.active { border-color: var(--color-2); font-weight:bold; }
+    .panel { display:none; }
+    .panel.active { display:block; }
+
+    /* 割り算モード */
+    .steps { background:#fafafa; padding:1rem; border-radius:8px; height:200px; overflow-y:auto; }
+    .steps .step {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: monospace;
+      margin-bottom: 0.3rem;
+    }
+    .step span {
+      margin: 0 0.2ch;
+      white-space: nowrap;
+      font-size: 1em;
+      color: var(--text);
+    }
+    .step .remainder {
+      font-weight: bold;
+      font-size: 1.4em;
+      color: var(--color-2);
+    }
+
+    /* 桁の重みモード */
+    .weights { display:flex; justify-content: space-between; margin-top:1rem; user-select:none; }
+    .weights .bit { flex:1; text-align:center; padding:0.5rem; border-radius:4px; background:#eee; transition: background 0.3s; cursor:pointer; white-space: pre-line; }
+    .weights .bit.on { background: var(--color-2); color:#fff; }
+
+    /* 結果・ボタン */
+    .result { text-align:center; margin-top:1rem; font-size:2em; font-weight:bold; color: var(--color-2); }
+    .button { margin-top:1rem; text-align:right; }
+    .button button { padding:0.6rem 1.2rem; border:none; border-radius:4px; background: var(--color-2); color:#fff; font-size:1rem; cursor:pointer; transition: background 0.3s; }
+    .button button:hover { background: #e85b50; }
+
+    /* フッター */
+    .footer { margin-top:2rem; text-align:center; font-size:0.9em; color:#666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="title">２進数シミュレーター</div>
+    <div class="header">
+      <input type="number" id="decimalInput" min="0" max="255" value="156">
+      <input type="range" id="slider" min="0" max="255" value="156">
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-target="weights">桁の重みで理解</div>
+      <div class="tab" data-target="division">割り算で理解</div>
+    </div>
+    <!-- 桁の重みモード -->
+    <div id="weights" class="panel active">
+      <div class="weights" id="weightsArea"></div>
+    </div>
+    <!-- 割り算モード -->
+    <div id="division" class="panel">
+      <div class="steps" id="stepsArea"></div>
+      <div class="result" id="binaryResult"></div>
+      <div class="button"><button id="startBtn">変換開始</button></div>
+    </div>
+  </div>
+  <div class="footer">キムりん＠松本深志高等学校</div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const decimalInput = document.getElementById('decimalInput');
+      const slider = document.getElementById('slider');
+      const tabs = document.querySelectorAll('.tab');
+      const weightsArea = document.getElementById('weightsArea');
+      const stepsArea = document.getElementById('stepsArea');
+      const binaryResult = document.getElementById('binaryResult');
+      const startBtn = document.getElementById('startBtn');
+
+      function clearDivision() {
+        stepsArea.innerHTML = '';
+        binaryResult.textContent = '';
+      }
+      function syncInput(val) {
+        decimalInput.value = val;
+        slider.value = val;
+        renderWeights();
+        clearDivision();
+      }
+      decimalInput.addEventListener('input', e => syncInput(e.target.value));
+      slider.addEventListener('input', e => syncInput(e.target.value));
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById(tab.dataset.target).classList.add('active');
+          if (tab.dataset.target === 'weights') {
+            renderWeights();
+          }
+          clearDivision();
+        });
+      });
+
+      function renderWeights() {
+        weightsArea.innerHTML = '';
+        const val = parseInt(decimalInput.value);
+        for (let i = 7; i >= 0; i--) {
+          const weight = 1 << i;
+          const bit = (val >> i) & 1;
+          const div = document.createElement('div');
+          div.className = 'bit' + (bit ? ' on' : '');
+          div.textContent = `${weight}\n${bit}`;
+          div.addEventListener('click', () => {
+            div.classList.toggle('on');
+            let sum = 0;
+            document.querySelectorAll('.bit').forEach((d, idx) => {
+              if (d.classList.contains('on')) sum += 1 << (7 - idx);
+            });
+            syncInput(sum);
+          });
+          weightsArea.appendChild(div);
+        }
+      }
+
+      function animateDivision() {
+        clearDivision();
+        let n = parseInt(decimalInput.value);
+        const remainders = [];
+        const steps = [];
+        while (n > 0) {
+          const q = Math.floor(n / 2);
+          const r = n % 2;
+          steps.push({n, q, r});
+          remainders.push(r);
+          n = q;
+        }
+        steps.forEach((step, i) => {
+          setTimeout(() => {
+            const {n, q, r} = step;
+            const div = document.createElement('div');
+            div.className = 'step';
+            div.innerHTML = `
+              <span>${n}</span>
+              <span>÷2</span>
+              <span>=</span>
+              <span>${q}</span>
+              <span>…</span>
+              <span class="remainder">${r}</span>
+            `;
+            stepsArea.appendChild(div);
+            if (i === steps.length - 1) {
+              binaryResult.textContent = remainders.reverse().join('');
+            }
+          }, i * 600);
+        });
+      }
+
+      // 初期表示
+      renderWeights();
+      animateDivision();
+
+      startBtn.addEventListener('click', animateDivision);
+    });
+  </script>
+</body>
+</html>
